@@ -10,6 +10,6 @@
   "dependencies": {
     "express": "^4.19.2"
   },
-  "devDependencies": {
-  }
+  "devDependencies": {},
+  "packageManager": "pnpm@10.30.3"
 }
