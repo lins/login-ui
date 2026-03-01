@@ -1,41 +1,68 @@
-import express from "express";
-
-// Vercel Serverless Function handler.
-// Express app is created per-invocation (OK for small demos).
-
-const app = express();
-
-// NOTE: Vercel's serverless request body handling can be finicky with urlencoded.
-// Use a text body parser for form posts and parse manually.
-app.use(express.text({ type: "application/x-www-form-urlencoded" }));
+// Vercel Serverless Function (Node.js)
+// Plain Node handler (no Express) to avoid body-parsing issues in serverless.
 
 const DEMO_USER = process.env.DEMO_USER || "admin";
 const DEMO_PASS = process.env.DEMO_PASS || "admin123";
 
-app.get("/", (_req, res) => res.redirect("/login"));
+export default async function handler(req, res) {
+  const url = new URL(req.url, "http://localhost");
 
-app.get("/login", (_req, res) => {
-  res.type("html").send(renderLoginPage({ error: "" }));
-});
-
-app.post("/login", (req, res) => {
-  const raw = typeof req.body === "string" ? req.body : "";
-  const params = new URLSearchParams(raw);
-  const username = params.get("username") || "";
-  const password = params.get("password") || "";
-
-  const ok = username === DEMO_USER && password === DEMO_PASS;
-  if (!ok) {
-    res.status(401).type("html").send(renderLoginPage({ error: "用户名或密码错误" }));
+  if (url.pathname === "/" && req.method === "GET") {
+    res.statusCode = 302;
+    res.setHeader("Location", "/login");
+    res.end();
     return;
   }
-  res.type("html").send(renderWelcomePage({ username }));
-});
 
-app.get("/healthz", (_req, res) => res.json({ ok: true }));
+  if (url.pathname === "/healthz") {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
 
-export default function handler(req, res) {
-  return app(req, res);
+  if (url.pathname === "/login" && req.method === "GET") {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.end(renderLoginPage({ error: "" }));
+    return;
+  }
+
+  if (url.pathname === "/login" && req.method === "POST") {
+    const raw = await readBody(req);
+    const params = new URLSearchParams(raw);
+    const username = params.get("username") || "";
+    const password = params.get("password") || "";
+
+    if (username !== DEMO_USER || password !== DEMO_PASS) {
+      res.statusCode = 401;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.end(renderLoginPage({ error: "用户名或密码错误" }));
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.end(renderWelcomePage({ username }));
+    return;
+  }
+
+  res.statusCode = 404;
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.end("not found");
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (chunk) => {
+      data += chunk;
+      if (data.length > 1e6) {
+        // basic safety
+        reject(new Error("body too large"));
+        req.destroy();
+      }
+    });
+    req.on("end", () => resolve(data));
+    req.on("error", reject);
+  });
 }
 
 function renderLoginPage({ error }) {
@@ -86,7 +113,7 @@ function renderLoginPage({ error }) {
             </h1>
 
             <p class="mt-4 text-sm text-slate-300/80 leading-relaxed">
-              这是一个适配 Vercel 的 Serverless 版本：Node.js + Express + Tailwind CDN。
+              这是一个适配 Vercel 的 Serverless 版本（纯 Node handler）。
             </p>
 
             <div class="mt-10 grid gap-3">
@@ -128,23 +155,11 @@ function renderLoginPage({ error }) {
                   placeholder="输入密码" />
               </div>
 
-              <div class="flex items-center justify-between pt-1">
-                <label class="inline-flex items-center gap-2 text-sm text-slate-300/80 select-none">
-                  <input type="checkbox" class="h-4 w-4 rounded border-white/10 bg-white/10" />
-                  记住我
-                </label>
-                <a class="text-sm text-cyan-300/90 hover:text-cyan-200" href="#" onclick="alert('演示页：请自行接入找回密码流程'); return false;">忘记密码？</a>
-              </div>
-
               <button type="submit"
                 class="group relative mt-2 w-full overflow-hidden rounded-2xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-4 py-3 font-semibold text-slate-950 shadow-lg shadow-cyan-500/10 transition hover:brightness-110 focus:outline-none focus:ring-4 focus:ring-cyan-400/20">
                 <span class="relative z-10">登录</span>
                 <span class="absolute inset-0 -translate-x-full bg-white/20 transition group-hover:translate-x-0"></span>
               </button>
-
-              <div class="pt-4 text-xs text-slate-400">
-                登录即表示你同意 <a href="#" class="text-slate-300 hover:text-slate-100" onclick="alert('演示页：请自行补充条款'); return false;">服务条款</a> 与 <a href="#" class="text-slate-300 hover:text-slate-100" onclick="alert('演示页：请自行补充隐私政策'); return false;">隐私政策</a>。
-              </div>
             </form>
           </section>
         </div>
@@ -168,7 +183,7 @@ function renderWelcomePage({ username }) {
   <div class="max-w-lg w-full rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
     <div class="text-sm text-slate-300/80">Signed in</div>
     <h1 class="mt-2 text-2xl font-semibold">欢迎，${escapeHtml(username)}</h1>
-    <p class="mt-3 text-slate-300/80 text-sm">这是演示的登录成功页面。下一步可以接入 JWT/Session、数据库用户、2FA 等。</p>
+    <p class="mt-3 text-slate-300/80 text-sm">这是演示的登录成功页面。</p>
     <div class="mt-6 flex gap-3">
       <a href="/login" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10">返回登录页</a>
       <a href="/healthz" class="rounded-2xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:brightness-110">健康检查</a>
