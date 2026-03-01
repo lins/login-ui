@@ -1,8 +1,8 @@
 // Vercel Serverless Function (Node.js)
 // Plain Node handler (no Express) to avoid body-parsing issues in serverless.
 
-const DEMO_USER = process.env.DEMO_USER || "admin";
-const DEMO_PASS = process.env.DEMO_PASS || "admin123";
+const DEMO_USER = (process.env.DEMO_USER || "admin").trim();
+const DEMO_PASS = (process.env.DEMO_PASS || "admin123").trim();
 
 export default async function handler(req, res) {
   const url = new URL(req.url, "http://localhost");
