@@ -4,7 +4,10 @@ import express from "express";
 // Express app is created per-invocation (OK for small demos).
 
 const app = express();
-app.use(express.urlencoded({ extended: false }));
+
+// NOTE: Vercel's serverless request body handling can be finicky with urlencoded.
+// Use a text body parser for form posts and parse manually.
+app.use(express.text({ type: "application/x-www-form-urlencoded" }));
 
 const DEMO_USER = process.env.DEMO_USER || "admin";
 const DEMO_PASS = process.env.DEMO_PASS || "admin123";
@@ -16,7 +19,11 @@ app.get("/login", (_req, res) => {
 });
 
 app.post("/login", (req, res) => {
-  const { username = "", password = "" } = req.body || {};
+  const raw = typeof req.body === "string" ? req.body : "";
+  const params = new URLSearchParams(raw);
+  const username = params.get("username") || "";
+  const password = params.get("password") || "";
+
   const ok = username === DEMO_USER && password === DEMO_PASS;
   if (!ok) {
     res.status(401).type("html").send(renderLoginPage({ error: "用户名或密码错误" }));
