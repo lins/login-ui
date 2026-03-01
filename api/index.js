@@ -20,6 +20,22 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Debug helper (no secrets): shows env var lengths to detect trailing newlines.
+  if (url.pathname === "/__debug/env" && req.method === "GET") {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.end(
+      JSON.stringify({
+        userLen: String(DEMO_USER).length,
+        passLen: String(DEMO_PASS).length,
+        userEndsWithNewline: String(DEMO_USER).endsWith("\n"),
+        passEndsWithNewline: String(DEMO_PASS).endsWith("\n"),
+        userPreview: String(DEMO_USER).slice(0, 2) + "***" + String(DEMO_USER).slice(-2),
+        passPreview: "***" + String(DEMO_PASS).slice(-2),
+      }),
+    );
+    return;
+  }
+
   if (url.pathname === "/login" && req.method === "GET") {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.end(renderLoginPage({ error: "" }));
